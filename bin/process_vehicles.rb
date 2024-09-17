@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative '../lib/vehicle_records'
 
 csv_path = ARGV[0] || 'vehicles.csv'

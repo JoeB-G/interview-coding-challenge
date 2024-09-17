@@ -8,12 +8,13 @@ class VehicleRecords
 
   def initialize(csv_path)
     @csv_path = csv_path
-    @completed_registrations = { swansea: Set.new, cardiff: Set.new, birmingham: Set.new, all: Set.new }
+    @completed_registrations = {}
     @unprocessable_vehicles = []
     @retry_limit = 10
     @total_retries = 0
   end
 
+  # method to loop through vehicles CSV attempting to generate a registration for each
   def generate_registrations
     CSV.foreach(@csv_path, headers: true, header_converters: :symbol) do |vehicle|
       date_of_manufacture = vehicle[:dateofmanufacture]
@@ -27,24 +28,37 @@ class VehicleRecords
           unprocessable_vehicles.append vehicle
           break
         end
+        break if add_to_completed_registrations(registration_area, registration) == :duplicate
 
-        break if completed_registrations[registration_area].add? registration
-        break if retry_count > retry_limit
+        if retry_count > retry_limit
+          pp 'Hit retry limit'
+          unprocessable_vehicles.append vehicle
+          break
+        end
 
-        pp registration
-        pp vehicle.to_h
         retry_count += 1
         @total_retries += 1
       end
     end
   end
 
+  def add_to_completed_registrations(registration_area, registration)
+    completed_registrations[registration_area] ||= Set.new
+    return unless completed_registrations[registration_area].add? registration
+
+    :duplicate
+  end
+
+  # output total of vehicle records processed
   def output_totals
-    pp "total number of unprocessable records #{unprocessable_vehicles.count}"
-    pp "total number of swansea registrations #{completed_registrations[:swansea].count}"
-    pp "total number of cardiff registrations #{completed_registrations[:cardiff].count}"
-    pp "total number of birmingham registrations #{completed_registrations[:birmingham].count}"
-    pp "total successful registered vehicles #{completed_registrations[:birmingham].count + completed_registrations[:cardiff].count + completed_registrations[:swansea].count}"
+    total_registrations = 0
+    completed_registrations.each do |location, registrations|
+      pp "total number of #{location} registrations #{registrations.count}"
+      total_registrations += registrations.count
+    end
+    pp "total successful registered vehicles #{total_registrations}"
+    pp "total vehicles where registration count not be determined #{unprocessable_vehicles.count}"
+    pp "total vehicle records processed #{total_registrations + unprocessable_vehicles.count}"
     pp "total retries #{@total_retries}"
   end
 end
